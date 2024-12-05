@@ -1,0 +1,413 @@
+---
+title: "Ep_final_Expo"
+output: html_document
+date: "2024-12-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(rio)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(polycor)
+library(modelsummary)
+library(psych)
+```
+
+```{r}
+data <- import("602-Modulo1287.sav")
+```
+
+```{r}
+data$depa_nac <- factor(data$depa_nac, levels = attr(data$depa_nac, "labels"),
+                        labels = names(attr(data$depa_nac, "labels")))
+```
+
+
+# SELECCIÓN Y FACTORIZACIÓN DE VARIABLES
+```{r}
+combined_data <- data %>%
+  select(
+    edad, depa_nac, p301, p116, p113, p114, p201, p501, p504
+  )
+
+```
+
+# Limpieza y transformación de datos
+```{r}
+data_clean <- combined_data %>%
+  mutate(
+    edad = as.numeric(edad),
+    depa_nac = factor(depa_nac),
+    conocimiento_institucion_derechosLGBTIQ = factor(p301, labels = c("Sí", "No")),
+    expresion_sin_temor = as.numeric(na_if(p116, 9) == 1),
+    orientacionsexual = factor(case_when(
+      p113 == 1 ~ "Homosexual",
+      p113 == 2 ~ "Bisexual",
+      p113 == 3 ~ "Pansexual",
+      p113 == 4 ~ "Asexual",
+      p113 %in% c(5, 6, 7, 8) ~ "Otros"
+    )),
+    identidadgenero = factor(case_when(
+      p114 == 1 ~ "Trans",
+      p114 == 2 ~ "Transexual",
+      p114 == 3 ~ "Trans femenina",
+      p114 == 4 ~ "Trans masculino",
+      p114 %in% c(6, 7, 8) ~ "Otros",
+      p114 == 9 ~ "No Binario"
+    )),
+    sufrio_discriminacion = factor(na_if(p201, 9), labels = c("Sí", "No")),
+    sociedad_respetuosa = factor(p501, labels = c("Sí", "No", "No sabe")),
+    reconocimiento_derechosLGBTIQ = factor(p504, labels = c("Muy Malo", "Malo", "Regular", "Bueno"))
+  ) %>%
+  select(-starts_with("p")) %>%
+  na.omit()
+
+```
+
+
+```{r}
+resumen <- data_clean %>%
+summarise( Media = mean(expresion_sin_temor),
+    Mediana = median(expresion_sin_temor),
+    Desviación = sd(expresion_sin_temor),
+    Mínimo = min(expresion_sin_temor),
+    Máximo = max(expresion_sin_temor))
+
+resumen
+```
+
+
+
+```{r}
+Freq <- data_clean %>%
+  group_by(expresion_sin_temor) %>%
+  summarise(Frecuencia = n())
+Freq
+```
+
+```{r}
+library(ggplot2)
+
+media <- resumen$Media
+mediana <- resumen$Mediana
+
+ggplot(data_clean, aes(x = expresion_sin_temor)) +
+  geom_histogram(binwidth = 0.4, fill = "skyblue", color = "black", alpha = 0.2) +
+  geom_vline(xintercept = media, color = "red", linetype = "dashed", size = 1) +  
+  geom_vline(xintercept = mediana, color = "green", linetype = "dashed", size = 1) + 
+  labs(title = "Expresión sin temor de OS e IG",
+       x = "Expresión", y = "Frecuencia") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10))
+```
+
+```{r}
+str(data_clean)
+```
+
+
+#Correlaciones
+
+```{r}
+data_numeric <- data_clean %>%
+  mutate(
+    edad = as.numeric(edad),
+    depa_nac = as.numeric(depa_nac),
+    conocimiento_institucion_derechosLGBTIQ = as.numeric(conocimiento_institucion_derechosLGBTIQ),
+    expresion_sin_temor=as.numeric(expresion_sin_temor),
+    orientacionsexual=as.numeric(orientacionsexual),
+    identidadgenero=as.numeric(identidadgenero),
+    sufrio_discriminacion=as.numeric(sufrio_discriminacion, na.rm=TRUE) ,
+    sociedad_respetuosa=as.numeric(sociedad_respetuosa),
+    reconocimiento_derechosLGBTIQ=as.numeric(reconocimiento_derechosLGBTIQ))
+    
+```
+
+
+
+```{r}
+ggplot(data_numeric, aes(x = edad, y = expresion_sin_temor)) + geom_point() + geom_smooth(method = "lm", color = "red") + labs(title = "Relación entre expresión sin temor de OS e IG y la edad")
+ggplot(data_numeric, aes(x = depa_nac, y = expresion_sin_temor)) + geom_point() + geom_smooth(method = "lm", color = "blue") + labs(title = "Relación entre expresión sin temor de OS e IG y departamento de nacimiento")
+ggplot(data_numeric, aes(x = conocimiento_institucion_derechosLGBTIQ, y = expresion_sin_temor)) + geom_point() + geom_smooth(method = "lm", color = "green") + labs(title = "Relación entre expresión sin temor de OS e IG y conocimiento de instituciones")
+ggplot(data_numeric, aes(x = orientacionsexual, y = expresion_sin_temor)) + geom_point() + geom_smooth(method = "lm", color = "red") + labs(title = "Relación entre expresión sin temor de OS e IG Y orientación sexual")
+ggplot(data_numeric, aes(x = identidadgenero, y = expresion_sin_temor)) + geom_point() + geom_smooth(method = "lm", color = "blue") + labs(title = "Relación entre expresión sin temor de OS e IG e identidad de género")
+ggplot(data_numeric, aes(x = sufrio_discriminacion, y = expresion_sin_temor)) + geom_point() + geom_smooth(method = "lm", color = "green") + labs(title = "Relación entre expresión sin temor de OS e IG y sufrir discriminación")
+ggplot(data_numeric, aes(x = sociedad_respetuosa, y = expresion_sin_temor)) + geom_point() + geom_smooth(method = "lm", color = "red") + labs(title = "Relación entre expresión sin temor de OS e IG y percepción de la sociedad")
+ggplot(data_numeric, aes(x = reconocimiento_derechosLGBTIQ, y = expresion_sin_temor)) + geom_point() + geom_smooth(method = "lm", color = "blue") + labs(title = "Relación entre expresión sin temor de OS e IG y reconocimiento de derechos")
+
+
+cor_x1 <- cor(data_numeric$expresion_sin_temor, data_numeric$edad, method = "pearson")
+cor_x2 <- cor(data_numeric$expresion_sin_temor, data_numeric$depa_nac, method = "pearson")
+cor_x3 <- cor(data_numeric$expresion_sin_temor, data_numeric$conocimiento_institucion_derechosLGBTIQ, method = "pearson")
+cor_x4 <- cor(data_numeric$expresion_sin_temor, data_numeric$orientacionsexual, method = "pearson")
+cor_x5 <- cor(data_numeric$expresion_sin_temor, data_numeric$identidadgenero, method = "pearson")
+cor_x6 <- cor(data_numeric$expresion_sin_temor, data_numeric$sufrio_discriminacion, method = "pearson")
+cor_x7 <- cor(data_numeric$expresion_sin_temor, data_numeric$sociedad_respetuosa, method = "pearson")
+cor_x8 <- cor(data_numeric$expresion_sin_temor, data_numeric$reconocimiento_derechosLGBTIQ, method = "pearson")
+
+
+print(paste("Correlación entre expresión sin temor de OS e IG y la edad:", cor_x1))
+print(paste("Correlación entre expresión sin temor de OS e IG y departamento de nacimiento:", cor_x2))
+print(paste("Correlación entre expresión sin temor de OS e IG y conocimiento de instituciones:", cor_x3))
+print(paste("Correlación entre expresión sin temor de OS e IG Y orientación sexual:", cor_x4))
+print(paste("Correlación entre expresión sin temor de OS e IG e identidad de género:", cor_x5))
+print(paste("Correlación entre expresión sin temor de OS e IG y sufrir discriminación:", cor_x6))
+print(paste("Correlación entre expresión sin temor de OS e IG y percepción de la sociedad:", cor_x7))
+print(paste("Correlación entre expresión sin temor de OS e IG y reconocimiento de derechos:", cor_x8))
+```
+
+#Hipótesis
+
+```{r}
+modelo_h1 <- glm(
+  expresion_sin_temor ~ edad + depa_nac,
+  data = data_clean,
+  family = binomial
+)
+```
+
+```{r}
+library(ggplot2)
+library(broom)
+coef_df <- tidy(modelo_h1, conf.int = TRUE)
+
+ggplot(coef_df, aes(x = term, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
+  theme_minimal() +
+  labs(title = "Coeficientes del Modelo de Regresión Logística", x = "Variables", y = "Coeficiente") +
+  coord_flip()
+```
+
+
+```{r}
+modelo_h2 <- glm(
+  expresion_sin_temor ~ conocimiento_institucion_derechosLGBTIQ + orientacionsexual + identidadgenero,
+  data = data_clean,
+  family = binomial
+)
+```
+
+
+```{r}
+library(ggplot2)
+library(broom)
+coef_df <- tidy(modelo_h2, conf.int = TRUE)
+
+ggplot(coef_df, aes(x = term, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
+  theme_minimal() +
+  labs(title = "Coeficientes del Modelo de Regresión Logística", x = "Variables", y = "Coeficiente") +
+  coord_flip()
+```
+
+
+```{r}
+modelo_h3 <- glm(
+  expresion_sin_temor ~ sufrio_discriminacion + sociedad_respetuosa + reconocimiento_derechosLGBTIQ,
+  data = data_clean,
+  family = binomial
+)
+```
+
+
+```{r}
+library(ggplot2)
+library(broom)
+coef_df <- tidy(modelo_h3, conf.int = TRUE)
+
+ggplot(coef_df, aes(x = term, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
+  theme_minimal() +
+  labs(title = "Coeficientes del Modelo de Regresión Logística", x = "Variables", y = "Coeficiente") +
+  coord_flip()
+```
+
+
+```{r}
+summary(modelo_h1)
+```
+```{r}
+summary(modelo_h2)
+```
+```{r}
+summary(modelo_h3)
+```
+#ANOVA
+
+```{r}
+anova(modelo_h1, modelo_h2, test = "Chisq")
+anova(modelo_h2, modelo_h3, test = "Chisq")
+anova(modelo_h1, modelo_h3, test = "Chisq")
+```
+
+```{r}
+AIC(modelo_h1)
+AIC(modelo_h2)
+AIC(modelo_h3)
+```
+
+#Supuestos
+
+```{r}
+residuos_h1 <- residuals(modelo_h1)
+
+hist(residuos_h1, main = "Histograma de los residuos del Modelo 1", xlab = "Residuos", col = "skyblue", border = "black")
+
+qqnorm(residuos_h1)
+qqline(residuos_h1, col = "red")
+
+ks_test <- ks.test(residuos_h1, "pnorm", mean(residuos_h1), sd(residuos_h1))
+print(ks_test)
+```
+
+
+```{r}
+residuos_h2 <- residuals(modelo_h2)
+
+hist(residuos_h2, main = "Histograma de los residuos del Modelo 2", xlab = "Residuos", col = "skyblue", border = "black")
+
+qqnorm(residuos_h2)
+qqline(residuos_h2, col = "red")
+
+ks_test <- ks.test(residuos_h2, "pnorm", mean(residuos_h2), sd(residuos_h2))
+print(ks_test)
+```
+
+
+```{r}
+residuos_h3 <- residuals(modelo_h3)
+
+hist(residuos_h3, main = "Histograma de los residuos del Modelo 3", xlab = "Residuos", col = "skyblue", border = "black")
+
+qqnorm(residuos_h3)
+qqline(residuos_h3, col = "red")
+
+ks_test <- ks.test(residuos_h3, "pnorm", mean(residuos_h3), sd(residuos_h3))
+print(ks_test)
+```
+
+
+```{r}
+library(car)
+
+vif(modelo_h1)
+```
+
+```{r}
+library(car)
+
+vif(modelo_h2)
+```
+
+```{r}
+library(car)
+
+vif(modelo_h3)
+```
+
+```{r}
+library(corrplot)
+corrplot(cor(data_numeric[, c("edad", "depa_nac", "conocimiento_institucion_derechosLGBTIQ", 
+                            "orientacionsexual", "identidadgenero", "sufrio_discriminacion", 
+                            "sociedad_respetuosa", "reconocimiento_derechosLGBTIQ")], use = "complete.obs"))
+
+```
+
+#Conglomerados`
+
+```{r}
+dataClus=data_numeric[,c(1,3:4,7:8)]
+```
+
+```{r}
+corMatrix=polycor::hetcor(dataClus)$correlations
+```
+
+```{r}
+library(psych)
+psych::KMO(corMatrix) 
+```
+
+```{r}
+cortest.bartlett(corMatrix,n=nrow(data_numeric))$p.value>0.05
+```
+
+```{r}
+library(matrixcalc)
+
+is.singular.matrix(corMatrix)
+```
+
+```{r}
+fa.parallel(data_numeric, fa = 'fa',correct = T,plot = F)
+```
+
+```{r}
+library(GPArotation)
+resfa <- fa(data_numeric,
+            nfactors = 2,
+            cor = 'mixed',
+            rotate = "varimax", #oblimin?
+            fm="minres")
+print(resfa$loadings)
+```
+
+```{r}
+print(resfa$loadings,cutoff = 0.5)
+```
+
+```{r}
+fa.diagram(resfa,main = "Resultados del EFA")
+
+```
+
+```{r}
+sort(resfa$communality)
+```
+
+```{r}
+sort(resfa$complexity)
+```
+
+```{r}
+resfa$TLI
+```
+
+```{r}
+resfa$rms
+
+```
+
+```{r}
+resfa$RMSEA
+```
+
+
+# GUARDAR RESULTADOS
+```{r}
+save.image(file = "data_numeric.RData")
+```
+
+```{r}
+library(writexl)
+
+write_xlsx(combined_data, path = "combined_data.xlsx")
+
+```
+
+```{r}
+write_xlsx(data_clean, path = "data_clean.xlsx")
+```
+
+
